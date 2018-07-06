@@ -3247,8 +3247,7 @@ transformCreateTableAsStmt(ParseState *pstate, CreateTableAsStmt *stmt)
 	result->commandType = CMD_UTILITY;
 	result->utilityStmt = (Node *) stmt;
 
-	/* Copy intoClause into the query in CTAS. */
-	((Query*)stmt->query)->intoClause = stmt->into;
+	((Query*)stmt->query)->isCTAS = true;
 
 	if (stmt->into->distributedBy && Gp_role == GP_ROLE_DISPATCH)
 		setQryDistributionPolicy((DistributedBy *) stmt->into->distributedBy, (Query *) stmt->query);

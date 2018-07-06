@@ -188,7 +188,7 @@ typedef struct Query
 	 * usual select clause does (See code in apply_motion() and cdbparallelize()),
 	 * and executor needs this info to specifiy correct target also.
 	 * */
-	IntoClause *intoClause;
+	bool		isCTAS;
 } Query;
 
 
