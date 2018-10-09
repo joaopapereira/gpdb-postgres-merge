@@ -1,10 +1,11 @@
 UNIT_TEST_HELPER_DIR=$(top_builddir)/src/test/unit/helpers
 MOCK_DIR=$(top_builddir)/src/test/unit/mock
+TEST_DOUBLE_DIR=$(top_builddir)/src/test/unit/test_doubles
 CMOCKERY_DIR=$(top_builddir)/src/test/unit/cmockery
 CMOCKERY_OBJS=$(CMOCKERY_DIR)/cmockery.o
 override CFLAGS+= -w $(PTHREAD_CFLAGS)
 
-override CPPFLAGS+= -I$(CMOCKERY_DIR) -I$(UNIT_TEST_HELPER_DIR)
+override CPPFLAGS+= -I$(CMOCKERY_DIR) -I$(UNIT_TEST_HELPER_DIR) -I$(TEST_DOUBLE_DIR)/include
 
 $(MOCK_DIR)/%_mock.c: $(abs_top_srcdir)/src/%.c
 	@echo mocking $<
@@ -14,6 +15,8 @@ $(MOCK_DIR)/%_mock.c: $(abs_top_srcdir)/src/%.c
 # Mark them as secondary in order not to be deleted automatically.
 .SECONDARY:
 $(MOCK_DIR)/%_mock.o: $(MOCK_DIR)/%_mock.c
+
+$(TEST_DOUBLE_DIR)/%_fake.o: $(TEST_DOUBLE_DIR)/%_fake.c $(TEST_DOUBLE_DIR)/include/%_fake.h
 
 all: $(patsubst %,%.t,$(TARGETS))
 
