@@ -47,7 +47,8 @@ main(int argc, char *argv[])
 	MemoryContextInit();
 
 	DataDir = "/tmp";
-	struct PGShmemHeader *mem = PGSharedMemoryCreate(99999, false, 0);
+	PGShmemHeader header = {};
+	struct PGShmemHeader *mem = PGSharedMemoryCreate(99999, false, 0, &header);
 	InitShmemAccess(mem);
 	InitShmemAllocation();
 
