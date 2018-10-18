@@ -28,29 +28,6 @@ default_teardown(void)
 	free(shmem_fake_retrieve_allocated_memory());
 }
 
-//void
-//test__NumLWLocks_it_returns_maximum_number_of_different_locks_available_in_the_system(
-//	void)
-//{
-//	assert_int_equal(NumLWLocks(), 8560);
-//}
-
-void
-test__LWLockShmemSize__expect_273612b_to_be_used_on_shmem(void)
-{
-	assert_int_equal(LWLockShmemSize(), 273612);
-}
-
-void
-test__CreateLWLocks_creates_all_locks(void)
-{
-	CreateLWLocks();
-	/*
-	 * The memory allocated should be the same as the LWLock Shared Memory Size
-	 */
-	assert_int_equal(shmem_fake_get_total_memory_allocated(), 273612);
-}
-
 void
 test__LWLockAcquire_when_no_lock_was_acquired_before_and_try_to_acquire_it_does_so_succesfuly(
 	void)
@@ -106,6 +83,7 @@ test__LWLockAcquire_when_trying_to_acquire_a_lock_twice_it_elogs_panic(void)
 	}
 	PG_CATCH();
 	{
+		SpinLockRelease(&ShmemIndexLock->mutex);
 	}
 	PG_END_TRY();
 
@@ -123,6 +101,7 @@ setup_outside_pg_process(void)
 static void
 teardown_outside_pg_process(void)
 {
+	default_teardown();
 	setup_pg_process_information();
 }
 void
@@ -130,17 +109,19 @@ test__LWLockAcquire_when_trying_to_acquire_a_lock_outside_of_a_pg_process_contex
 	void)
 {
 	CreateLWLocks();
-	LWLockAcquire(1, LW_EXCLUSIVE);
+	LWLockAcquire(ShmemIndexLock, LW_EXCLUSIVE);
 	assert_true("Success aquiring the lock for the first time");
 
 	expect_elog_with_message(PANIC, "cannot wait without a PGPROC structure");
 	PG_TRY();
 	{
-		LWLockAcquire(1, LW_EXCLUSIVE);
+		LWLockAcquire(ShmemIndexLock, LW_EXCLUSIVE);
+		LWLockRelease(ShmemIndexLock);
 		fail_msg("elog Should have been called");
 	}
 	PG_CATCH();
 	{
+		SpinLockRelease(&ShmemIndexLock->mutex);
 	}
 	PG_END_TRY();
 }
@@ -174,10 +155,10 @@ void
 test__LWLockRelease_when_did_not_acquire_a_lock_it_elogs(void)
 {
 	CreateLWLocks();
-	expect_elog_with_message(ERROR, "lock %d is not held");
+	expect_elog_with_message(ERROR, "lock %s %d is not held");
 	PG_TRY();
 	{
-		LWLockRelease(2);
+		LWLockRelease(ShmemIndexLock);
 		fail_msg("elog Should have been called");
 	}
 	PG_CATCH();
@@ -190,16 +171,16 @@ void
 test__LWLockHeldByMe_when_process_hold_a_lock_it_return_true(void)
 {
 	CreateLWLocks();
-	LWLockAcquire(1, LW_EXCLUSIVE);
-	assert_true(LWLockHeldByMe(1));
-	LWLockRelease(1);
+	LWLockAcquire(ShmemIndexLock, LW_EXCLUSIVE);
+	assert_true(LWLockHeldByMe(ShmemIndexLock));
+	LWLockRelease(ShmemIndexLock);
 }
 
 void
 test__LWLockHeldByMe_when_process_is_not_holding_a_lock_it_return_false(void)
 {
 	CreateLWLocks();
-	assert_false(LWLockHeldByMe(5));
+	assert_false(LWLockHeldByMe(ShmemIndexLock));
 }
 
 void
@@ -207,9 +188,9 @@ test__LWLockHeldExclusiveByMe_when_process_hold_an_exclusive_lock_it_return_true
 	void)
 {
 	CreateLWLocks();
-	LWLockAcquire(1, LW_EXCLUSIVE);
-	assert_true(LWLockHeldExclusiveByMe(1));
-	LWLockRelease(1);
+	LWLockAcquire(ShmemIndexLock, LW_EXCLUSIVE);
+	assert_true(LWLockHeldExclusiveByMe(ShmemIndexLock));
+	LWLockRelease(ShmemIndexLock);
 }
 
 void
@@ -217,9 +198,9 @@ test__LWLockHeldExclusiveByMe_when_process_hold_a_shared_lock_it_return_false(
 	void)
 {
 	CreateLWLocks();
-	LWLockAcquire(1, LW_SHARED);
-	assert_false(LWLockHeldExclusiveByMe(1));
-	LWLockRelease(1);
+	LWLockAcquire(ShmemIndexLock, LW_SHARED);
+	assert_false(LWLockHeldExclusiveByMe(ShmemIndexLock));
+	LWLockRelease(ShmemIndexLock);
 }
 
 void
@@ -227,7 +208,7 @@ test__LWLockHeldExclusiveByMe_when_process_is_not_holding_a_lock_it_return_false
 	void)
 {
 	CreateLWLocks();
-	assert_false(LWLockHeldByMe(5));
+	assert_false(LWLockHeldByMe(ShmemIndexLock));
 }
 
 int
@@ -236,13 +217,6 @@ main(int argc, char *argv[])
 	cmockery_parse_arguments(argc, argv);
 
 	const UnitTest tests[] = {
-		unit_test_setup_teardown(
-			test__LWLockShmemSize__expect_273612b_to_be_used_on_shmem,
-			reset_process_information,
-			default_teardown),
-		unit_test_setup_teardown(test__CreateLWLocks_creates_all_locks,
-								 reset_process_information,
-								 default_teardown),
 		unit_test_setup_teardown(
 			test__LWLockAcquire_when_no_lock_was_acquired_before_and_try_to_acquire_it_does_so_succesfuly,
 			reset_process_information,
